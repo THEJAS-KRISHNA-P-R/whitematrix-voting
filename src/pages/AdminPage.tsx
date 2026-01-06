@@ -5,18 +5,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { LogOut, Plus, Pencil, Trash2, AlertCircle, CheckCircle, ArrowLeft, Users } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { Candidate } from '@/types'
 
 interface VoteRecord {
-  voter_id: string
+  id: string
+  user_id: string
   candidate_id: string
-  voted_at: string
   voter_name: string
-  voter_email: string
-  voter_photo: string | null
+  voter_linkedin: string
+  created_at: string
 }
 
 export function AdminPage() {
@@ -30,7 +31,8 @@ export function AdminPage() {
   
   // Vote tracking state
   const [votes, setVotes] = useState<VoteRecord[]>([])
-  const [selectedCandidate, setSelectedCandidate] = useState<string>('all')
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
+  const [showVotersModal, setShowVotersModal] = useState(false)
   const [loadingVotes, setLoadingVotes] = useState(false)
 
   // Form state
@@ -68,28 +70,11 @@ export function AdminPage() {
     setLoadingVotes(true)
     const { data, error } = await supabase
       .from('votes')
-      .select(`
-        voter_id,
-        candidate_id,
-        voted_at,
-        users!inner(
-          id,
-          email,
-          display_name,
-          photo_url
-        )
-      `)
-      .order('voted_at', { ascending: false })
+      .select('*')
+      .order('created_at', { ascending: false })
 
     if (!error && data) {
-      setVotes(data.map((v: any) => ({
-        voter_id: v.voter_id,
-        candidate_id: v.candidate_id,
-        voted_at: v.voted_at,
-        voter_name: v.users.display_name || 'Anonymous',
-        voter_email: v.users.email || '',
-        voter_photo: v.users.photo_url,
-      })))
+      setVotes(data)
     }
     setLoadingVotes(false)
   }
@@ -187,9 +172,16 @@ export function AdminPage() {
     }
   }
 
-  const filteredVotes = selectedCandidate === 'all' 
-    ? votes 
-    : votes.filter(v => v.candidate_id === selectedCandidate)
+  const filteredVotes = selectedCandidateId 
+    ? votes.filter(v => v.candidate_id === selectedCandidateId) 
+    : []
+
+  const selectedCandidate = candidates.find(c => c.id === selectedCandidateId)
+
+  const handleViewVoters = (candidateId: string) => {
+    setSelectedCandidateId(candidateId)
+    setShowVotersModal(true)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -308,84 +300,54 @@ export function AdminPage() {
           </form>
         </Card>
 
-        {/* Vote Viewer Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Vote Records ({filteredVotes.length})
-            </CardTitle>
-            <CardDescription>
-              See who voted for which candidate
-            </CardDescription>
-          </CardHeader>
+        {/* Voters Modal */}
+        <Dialog open={showVotersModal} onOpenChange={setShowVotersModal}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Voters for {selectedCandidate?.name}
+              </DialogTitle>
+              <DialogDescription>
+                {filteredVotes.length} {filteredVotes.length === 1 ? 'vote' : 'votes'} received
+              </DialogDescription>
+            </DialogHeader>
 
-          <CardContent>
-            <div className="space-y-4">
-              {/* Candidate Filter Dropdown */}
-              <div className="space-y-2">
-                <Label htmlFor="candidate-filter">Filter by Candidate</Label>
-                <select
-                  id="candidate-filter"
-                  value={selectedCandidate}
-                  onChange={(e) => setSelectedCandidate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background"
-                >
-                  <option value="all">All Candidates ({votes.length} votes)</option>
-                  {candidates.map((candidate) => {
-                    const voteCount = votes.filter(v => v.candidate_id === candidate.id).length
-                    return (
-                      <option key={candidate.id} value={candidate.id}>
-                        {candidate.name} ({voteCount} votes)
-                      </option>
-                    )
-                  })}
-                </select>
-              </div>
-
-              {/* Vote List */}
+            <div className="space-y-3 mt-4">
               {loadingVotes ? (
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                 </div>
               ) : filteredVotes.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No votes recorded yet.
+                  No votes yet for this candidate.
                 </div>
               ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {filteredVotes.map((vote, index) => {
-                    const candidate = candidates.find(c => c.id === vote.candidate_id)
-                    return (
-                      <div
-                        key={`${vote.voter_id}-${vote.candidate_id}-${index}`}
-                        className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                filteredVotes.map((vote) => (
+                  <div
+                    key={vote.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium">{vote.voter_name}</div>
+                      <a
+                        href={vote.voter_linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
                       >
-                        <img
-                          src={vote.voter_photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(vote.voter_name)}`}
-                          alt={vote.voter_name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium">{vote.voter_name}</div>
-                          <div className="text-sm text-muted-foreground">{vote.voter_email}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-medium">
-                            Voted for: <span className="text-primary">{candidate?.name || 'Unknown'}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(vote.voted_at).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                        View LinkedIn Profile →
+                      </a>
+                    </div>
+                    <div className="text-xs text-muted-foreground text-right">
+                      {new Date(vote.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
 
         {/* Existing Candidates */}
         <div>
@@ -435,6 +397,15 @@ export function AdminPage() {
                       <div>
                         <span className="font-medium">Total Votes:</span> {candidate.voteCount}
                       </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2"
+                        onClick={() => handleViewVoters(candidate.id)}
+                      >
+                        <Users className="h-4 w-4 mr-1" />
+                        View Voters ({votes.filter(v => v.candidate_id === candidate.id).length})
+                      </Button>
                     </div>
                   </CardContent>
 
