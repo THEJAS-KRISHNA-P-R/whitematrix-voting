@@ -27,7 +27,7 @@ The admin account has special privileges including candidate management and vote
 - ✅ **Protected Routes** - Dashboard accessible only to authenticated users
 - ✅ **Admin Account** - Special admin privileges for `admin@voting.com`
 
-### Admin Features (admin@voting.com only)
+### Admin Features (admin@voting.com (password : admin@123) only)
 - ✅ **Candidate Management** - Add, edit, and delete candidates
 - ✅ **Candidate Details Required**:
   - Full name
