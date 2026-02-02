@@ -81,7 +81,7 @@ export function LinkedInModal({ open, onSubmit }: LinkedInModalProps) {
                 disabled={isSubmitting}
               />
               <p className="text-xs text-muted-foreground">
-                Example: https://linkedin.com/in/john-doe
+                Example: https://linkedin.com/in/Alex
               </p>
             </div>
           </div>
